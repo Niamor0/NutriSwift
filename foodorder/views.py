@@ -60,3 +60,23 @@ def user_signup(request):
             return redirect('signup')
 
     return render(request, 'signup.html')
+def user_login(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+
+        user = authenticate(request, username=username, password=password)
+
+        if user is not None:
+            if user.is_staff:
+                messages.error(request, 'Please use admin login page!')
+                return redirect('admin_login')
+            
+            login(request, user)
+            messages.success(request, f'Welcome back, {username}!')
+            return redirect('home')
+        else:
+            messages.error(request, 'Invalid username or password!')
+            return redirect('login')
+
+    return render(request, 'login.html')
