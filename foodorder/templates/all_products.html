@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}All Products{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-12 px-6 sm:px-8 lg:px-12">
+    <h1 class="text-4xl font-bold text-center text-gray-800 mb-10">Our Delicious Products</h1>
+
+    <!-- Pizza Section -->
+    <h2 class="text-3xl font-semibold text-gray-800 mb-6">Pizzas</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
+        {% for pizza in pizzas %}
+        <a href="{% url 'product_detail' 'pizza' pizza.id %}" class="block bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-2xl transition-shadow duration-300">
+            <img src="{{ pizza.image.url }}" alt="{{ pizza.name }}" class="h-64 w-full object-cover">
+            <div class="p-6">
+                <h3 class="text-xl font-bold text-gray-800">{{ pizza.name }}</h3>
+                <p class="text-lg font-bold text-green-600 mt-3">৳ {{ pizza.price }}</p>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Pasta Section -->
+    <h2 class="text-3xl font-semibold text-gray-800 mb-6">Pastas</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
+        {% for pasta in pastas %}
+        <a href="{% url 'product_detail' 'pasta' pasta.id %}" class="block bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-2xl transition-shadow duration-300">
+            <img src="{{ pasta.image.url }}" alt="{{ pasta.name }}" class="h-64 w-full object-cover">
+            <div class="p-6">
+                <h3 class="text-xl font-bold text-gray-800">{{ pasta.name }}</h3>
+                <p class="text-lg font-bold text-green-600 mt-3">৳ {{ pasta.price }}</p>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Burger Section -->
+    <h2 class="text-3xl font-semibold text-gray-800 mb-6">Burgers</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
+        {% for burger in burgers %}
+        <a href="{% url 'product_detail' 'burger' burger.id %}" class="block bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-2xl transition-shadow duration-300">
+            <img src="{{ burger.image.url }}" alt="{{ burger.name }}" class="h-64 w-full object-cover">
+            <div class="p-6">
+                <h3 class="text-xl font-bold text-gray-800">{{ burger.name }}</h3>
+                <p class="text-lg font-bold text-green-600 mt-3">৳ {{ burger.price }}</p>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Dessert Section -->
+    <h2 class="text-3xl font-semibold text-gray-800 mb-6">Desserts</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        {% for dessert in desserts %}
+        <a href="{% url 'product_detail' 'dessert' dessert.id %}" class="block bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-2xl transition-shadow duration-300">
+            <img src="{{ dessert.image.url }}" alt="{{ dessert.name }}" class="h-64 w-full object-cover">
+            <div class="p-6">
+                <h3 class="text-xl font-bold text-gray-800">{{ dessert.name }}</h3>
+                <p class="text-lg font-bold text-green-600 mt-3">৳ {{ dessert.price }}</p>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
