@@ -1,22 +1,19 @@
-from django.http import Http404
-from django.utils.translation import gettext as _
+from django.contrib import messages
 
 
-def feed(request, url, feed_dict=None):
-    """Provided for backwards compatibility."""
-    if not feed_dict:
-        raise Http404(_("No feeds are registered."))
+class SuccessMessageMixin:
+    """
+    Add a success message on successful form submission.
+    """
 
-    slug = url.partition("/")[0]
-    try:
-        f = feed_dict[slug]
-    except KeyError:
-        raise Http404(_("Slug %r isn’t registered.") % slug)
+    success_message = ""
 
-    instance = f()
-    instance.feed_url = getattr(f, "feed_url", None) or request.path
-    instance.title_template = f.title_template or ("feeds/%s_title.html" % slug)
-    instance.description_template = f.description_template or (
-        "feeds/%s_description.html" % slug
-    )
-    return instance(request)
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        success_message = self.get_success_message(form.cleaned_data)
+        if success_message:
+            messages.success(self.request, success_message)
+        return response
+
+    def get_success_message(self, cleaned_data):
+        return self.success_message % cleaned_data

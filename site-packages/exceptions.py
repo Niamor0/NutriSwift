@@ -1,25 +1,19 @@
-from django.core.exceptions import SuspiciousOperation
+from django.core.exceptions import BadRequest, SuspiciousOperation
 
 
-class DisallowedModelAdminLookup(SuspiciousOperation):
-    """Invalid filter was passed to admin view via URL querystring"""
-
-    pass
-
-
-class DisallowedModelAdminToField(SuspiciousOperation):
-    """Invalid to_field was passed to admin view via URL query string"""
+class InvalidSessionKey(SuspiciousOperation):
+    """Invalid characters in session key"""
 
     pass
 
 
-class AlreadyRegistered(Exception):
-    """The model is already registered."""
+class SuspiciousSession(SuspiciousOperation):
+    """The session may be tampered with"""
 
     pass
 
 
-class NotRegistered(Exception):
-    """The model is not registered."""
+class SessionInterrupted(BadRequest):
+    """The session was interrupted."""
 
     pass
