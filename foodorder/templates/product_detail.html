@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ product.name }} Details{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-12 px-6 sm:px-8 lg:px-12">
+    <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-md overflow-hidden">
+        <!-- Product Image -->
+        <div>
+            <img src="{{ product.image.url }}" alt="{{ product.name }}" class="w-full h-[300px] object-cover">
+        </div>
+
+        <!-- Product Details -->
+        <div class="p-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-4">{{ product.name }}</h1>
+            <div class="flex items-center mb-4">
+                {% if product.old_price %}
+                <p class="text-lg text-gray-500 mr-2 line-through">৳ {{ product.old_price }}</p>
+                {% endif %}
+                <p class="text-2xl font-bold text-green-600">৳ {{ product.price }}</p>
+            </div>
+            <p class="text-gray-700 text-lg">{{ product.description }}</p>
+
+            <!-- Order Now Button -->
+            <div class="mt-8">
+                <form action="{% url 'add_to_cart' product_type|lower product.id %}" method="POST" class="inline">
+                    {% csrf_token %}
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center border rounded-lg">
+                            <button type="button" onclick="decrementQuantity()"
+                                class="px-4 py-2 text-indigo-600 hover:bg-gray-100 focus:outline-none">
+                                -
+                            </button>
+                            <input type="number" name="quantity" id="quantity" value="1" min="1" max="10"
+                                class="w-16 text-center border-x py-2 focus:outline-none" readonly>
+                            <button type="button" onclick="incrementQuantity()"
+                                class="px-4 py-2 text-indigo-600 hover:bg-gray-100 focus:outline-none">
+                                +
+                            </button>
+                        </div>
+                        <button type="submit"
+                            class="px-6 py-3 bg-indigo-600 text-white text-lg font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring focus:ring-indigo-300">
+                            Add to Cart
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    function incrementQuantity() {
+        const input = document.getElementById('quantity');
+        const currentValue = parseInt(input.value);
+        if (currentValue < 10) {
+            input.value = currentValue + 1;
+        }
+    }
+
+    function decrementQuantity() {
+        const input = document.getElementById('quantity');
+        const currentValue = parseInt(input.value);
+        if (currentValue > 1) {
+            input.value = currentValue - 1;
+        }
+    }
+</script>
+
+{% endblock %}

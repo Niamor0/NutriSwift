@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="bg-white rounded-lg shadow-md p-8 max-w-3xl mx-auto">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-green-600 mb-4">Order Confirmed!</h1>
+            <p class="text-xl mb-2">Thank you for your order</p>
+            <p class="text-gray-600">Order #{{ order.id }}</p>
+        </div>
+        
+        <div class="border-t border-b py-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Order Details</h2>
+            <div class="space-y-4">
+                {% for item in order_items %}
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="font-medium">{{ item.product.name }}</h3>
+                        <p class="text-gray-600">Quantity: {{ item.item.quantity }}</p>
+                    </div>
+                    <p class="font-medium">৳ {{ item.subtotal|floatformat:2 }}</p>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="mt-4 pt-4 border-t">
+                <div class="flex justify-between font-semibold">
+                    <span>Total Amount:</span>
+                    <span>৳ {{ order.total_price }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mb-6">
+            <h2 class="text-xl font-semibold mb-4">Delivery Information</h2>
+            <div class="space-y-2">
+                <p><span class="font-medium">Address:</span> {{ order.delivery.address }}</p>
+                <p><span class="font-medium">Contact:</span> {{ order.delivery.contact_number }}</p>
+                <p><span class="font-medium">Payment Method:</span> {{ order.get_payment_method_display }}</p>
+                <p><span class="font-medium">Order Status:</span> {{ order.get_status_display }}</p>
+            </div>
+        </div>
+        
+        <div class="text-center">
+            <a href="{% url 'all_products' %}" 
+               class="inline-block bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">
+                Continue Shopping
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

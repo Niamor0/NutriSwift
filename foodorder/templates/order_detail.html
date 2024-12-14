@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block title %}Order Detail{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-12 px-6 sm:px-8 lg:px-12">
+    <h1 class="text-4xl font-bold text-center text-gray-800 mb-10">Order #{{ order.id }}</h1>
+
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-2xl font-semibold text-gray-800">Order Items</h2>
+
+        <ul class="mt-4">
+            {% for item in order.items.all %}
+            <li class="flex justify-between mb-4">
+                <span>{{ item.product_type }} (x{{ item.quantity }})</span>
+                <span>৳ {{ item.subtotal }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+
+        <hr class="my-4">
+
+        <div class="flex justify-between text-lg font-semibold">
+            <span>Total Price:</span>
+            <span>৳ {{ order.total_price }}</span>
+        </div>
+
+        <p class="mt-2 text-gray-700">Status: {{ order.get_status_display }}</p>
+        <p class="text-gray-700">Payment Method: {{ order.payment_method }}</p>
+    </div>
+</div>
+{% endblock %}

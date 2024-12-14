@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}Pizzas{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-12 px-6 sm:px-8 lg:px-12">
+    <h1 class="text-4xl font-bold text-center text-gray-800 mb-10">Our Delicious Pizzas</h1>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        {% for pizza in pizzas %}
+        <!-- Entire Card Wrapped in Anchor Tag -->
+        <a href="{% url 'product_detail' 'pizza' pizza.id %}" class="block bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-2xl transition-shadow duration-300">
+            <!-- Pizza Image -->
+            <img src="{{ pizza.image.url }}" alt="{{ pizza.name }}" class="h-64 w-full object-cover">
+            <div class="p-6">
+                <!-- Pizza Name -->
+                <h2 class="text-xl font-bold text-gray-800">{{ pizza.name }}</h2>
+                <!-- Pizza Price -->
+                <p class="text-lg font-bold text-green-600 mt-3">৳ {{ pizza.price }}</p>
+                <!-- View Details Call-to-Action -->
+                <div class="mt-6 flex justify-end">
+                    <span class="px-6 py-2 bg-yellow-500 text-white text-sm font-semibold rounded-lg hover:bg-yellow-600 focus:outline-none">
+                        View Details
+                    </span>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
