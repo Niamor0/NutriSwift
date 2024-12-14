@@ -1,0 +1,77 @@
+{% extends 'admin/Sidebar.html' %}
+
+{% block title %}Admin - User Management{% endblock %}
+
+{% block content %}
+<div class="min-h-screen p-8">
+    <!-- Main Content -->
+    <div class="max-w-8xl mx-auto">
+        <!-- Users Table -->
+        <div class="bg-white shadow-2xl rounded-lg overflow-hidden transform hover:scale-[1.01] transition-all duration-300">
+            <div class="px-8 py-6 bg-gradient-to-r from-blue-600 to-indigo-600">
+                <h3 class="text-3xl leading-8 font-bold text-white">
+                    Registered Users
+                </h3>
+            </div>
+            <div class="bg-white overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-8 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Username</th>
+                            <th class="px-8 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Email</th>
+                            <th class="px-8 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Phone</th>
+                            <th class="px-8 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Join Date</th>
+                            <th class="px-8 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Orders</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for user in users %}
+                        <tr class="hover:bg-gray-50 transition-colors duration-150">
+                            <td class="px-8 py-6 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-12 w-12">
+                                        <img class="h-12 w-12 rounded-full object-cover" src="https://ui-avatars.com/api/?name={{ user.username }}&background=random" alt="{{ user.username }}">
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-lg font-medium text-gray-900">
+                                            {{ user.username }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-8 py-6 whitespace-nowrap text-lg text-gray-900">{{ user.email }}</td>
+                            <td class="px-8 py-6 whitespace-nowrap text-lg text-gray-900">{{ user.userprofile.phone }}</td>
+                            <td class="px-8 py-6 whitespace-nowrap text-lg text-gray-900">{{ user.date_joined|date:"M d, Y" }}</td>
+                            <td class="px-8 py-6 whitespace-nowrap">
+                                <span class="px-3 py-1 inline-flex text-lg leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    {{ user.orders.count }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.querySelector('table');
+    const rows = table.querySelectorAll('tbody tr');
+
+    rows.forEach((row, index) => {
+        row.style.opacity = '0';
+        row.style.animation = `fadeIn 0.5s ease-out ${index * 0.1}s forwards`;
+    });
+});
+</script>
+{% endblock %}

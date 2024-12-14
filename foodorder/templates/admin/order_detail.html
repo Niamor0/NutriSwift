@@ -1,0 +1,78 @@
+{% extends 'admin/Sidebar.html' %}
+
+{% block title %}Admin - Order Detail{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <!-- Main Content -->
+    <div class="max-w-4xl w-full space-y-8">
+        <!-- Order Information -->
+        <div class="bg-white shadow-lg overflow-hidden sm:rounded-lg mb-6 transform hover:scale-105 transition-transform duration-300">
+            <div class="px-4 py-5 sm:px-6 bg-gradient-to-r from-purple-500 to-indigo-600">
+                <h3 class="text-2xl leading-6 font-bold text-white">
+                    Order #{{ order.id }}
+                </h3>
+                <p class="mt-1 max-w-2xl text-sm text-purple-100">
+                    Placed on {{ order.created_at|date:"M d, Y" }}
+                </p>
+            </div>
+            <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
+                <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
+                    <div class="sm:col-span-1">
+                        <dt class="text-sm font-medium text-gray-500">Customer Name</dt>
+                        <dd class="mt-1 text-lg font-semibold text-gray-900">{{ order.user.username }}</dd>
+                    </div>
+                    <div class="sm:col-span-1">
+                        <dt class="text-sm font-medium text-gray-500">Email</dt>
+                        <dd class="mt-1 text-lg font-semibold text-gray-900">{{ order.user.email }}</dd>
+                    </div>
+                    <div class="sm:col-span-1">
+                        <dt class="text-sm font-medium text-gray-500">Phone</dt>
+                        <dd class="mt-1 text-lg font-semibold text-gray-900">{{ order.user.userprofile.phone }}</dd>
+                    </div>
+                    <div class="sm:col-span-1">
+                        <dt class="text-sm font-medium text-gray-500">Total Amount</dt>
+                        <dd class="mt-1 text-2xl font-bold text-green-600">BDT {{ order.total_price }}</dd>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <dt class="text-sm font-medium text-gray-500">Delivery Address</dt>
+                        <dd class="mt-1 text-lg font-semibold text-gray-900">{{ order.delivery.address }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Order Status Update -->
+        <div class="bg-white shadow-lg overflow-hidden sm:rounded-lg mb-6 transform hover:scale-105 transition-transform duration-300">
+            <div class="px-4 py-5 sm:px-6 bg-gradient-to-r from-yellow-400 to-orange-500">
+                <h3 class="text-2xl leading-6 font-bold text-white">Order Status</h3>
+                <form method="POST" action="{% url 'update_order_status' order.id %}" class="mt-4 flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                    {% csrf_token %}
+                    <select name="status" class="flex-grow rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-lg">
+                        {% for status in order.STATUS_CHOICES %}
+                        <option value="{{ status.0 }}" {% if order.status == status.0 %}selected{% endif %}>
+                            {{ status.1 }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="inline-flex items-center px-6 py-3 border border-transparent text-lg font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-300">
+                        Update Status
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const form = document.querySelector('form');
+    const button = form.querySelector('button');
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        button.classList.add('animate-pulse');
+        setTimeout(() => {
+            form.submit();
+        }, 500);
+    });
+</script>
+{% endblock %}
