@@ -1,88 +1,70 @@
-from django.apps import apps
-from django.contrib.contenttypes.models import ContentType
+from django.conf import settings
+from django.contrib.flatpages.models import FlatPage
 from django.contrib.sites.shortcuts import get_current_site
-from django.core.exceptions import ObjectDoesNotExist
-from django.http import Http404, HttpResponseRedirect
-from django.utils.translation import gettext as _
+from django.http import Http404, HttpResponse, HttpResponsePermanentRedirect
+from django.shortcuts import get_object_or_404
+from django.template import loader
+from django.utils.safestring import mark_safe
+from django.views.decorators.csrf import csrf_protect
+
+DEFAULT_TEMPLATE = "flatpages/default.html"
+
+# This view is called from FlatpageFallbackMiddleware.process_response
+# when a 404 is raised, which often means CsrfViewMiddleware.process_view
+# has not been called even if CsrfViewMiddleware is installed. So we need
+# to use @csrf_protect, in case the template needs {% csrf_token %}.
+# However, we can't just wrap this view; if no matching flatpage exists,
+# or a redirect is required for authentication, the 404 needs to be returned
+# without any CSRF checks. Therefore, we only
+# CSRF protect the internal implementation.
 
 
-def shortcut(request, content_type_id, object_id):
+def flatpage(request, url):
     """
-    Redirect to an object's page based on a content-type ID and an object ID.
+    Public interface to the flat page view.
+
+    Models: `flatpages.flatpages`
+    Templates: Uses the template defined by the ``template_name`` field,
+        or :template:`flatpages/default.html` if template_name is not defined.
+    Context:
+        flatpage
+            `flatpages.flatpages` object
     """
-    # Look up the object, making sure it's got a get_absolute_url() function.
+    if not url.startswith("/"):
+        url = "/" + url
+    site_id = get_current_site(request).id
     try:
-        content_type = ContentType.objects.get(pk=content_type_id)
-        if not content_type.model_class():
-            raise Http404(
-                _("Content type %(ct_id)s object has no associated model")
-                % {"ct_id": content_type_id}
-            )
-        obj = content_type.get_object_for_this_type(pk=object_id)
-    except (ObjectDoesNotExist, ValueError):
-        raise Http404(
-            _("Content type %(ct_id)s object %(obj_id)s doesn’t exist")
-            % {"ct_id": content_type_id, "obj_id": object_id}
-        )
-
-    try:
-        get_absolute_url = obj.get_absolute_url
-    except AttributeError:
-        raise Http404(
-            _("%(ct_name)s objects don’t have a get_absolute_url() method")
-            % {"ct_name": content_type.name}
-        )
-    absurl = get_absolute_url()
-
-    # Try to figure out the object's domain, so we can do a cross-site redirect
-    # if necessary.
-
-    # If the object actually defines a domain, we're done.
-    if absurl.startswith(("http://", "https://", "//")):
-        return HttpResponseRedirect(absurl)
-
-    # Otherwise, we need to introspect the object's relationships for a
-    # relation to the Site object
-    try:
-        object_domain = get_current_site(request).domain
-    except ObjectDoesNotExist:
-        object_domain = None
-
-    if apps.is_installed("django.contrib.sites"):
-        Site = apps.get_model("sites.Site")
-        opts = obj._meta
-
-        for field in opts.many_to_many:
-            # Look for a many-to-many relationship to Site.
-            if field.remote_field.model is Site:
-                site_qs = getattr(obj, field.name).all()
-                if object_domain and site_qs.filter(domain=object_domain).exists():
-                    # The current site's domain matches a site attached to the
-                    # object.
-                    break
-                # Caveat: In the case of multiple related Sites, this just
-                # selects the *first* one, which is arbitrary.
-                site = site_qs.first()
-                if site:
-                    object_domain = site.domain
-                    break
+        f = get_object_or_404(FlatPage, url=url, sites=site_id)
+    except Http404:
+        if not url.endswith("/") and settings.APPEND_SLASH:
+            url += "/"
+            f = get_object_or_404(FlatPage, url=url, sites=site_id)
+            return HttpResponsePermanentRedirect("%s/" % request.path)
         else:
-            # No many-to-many relationship to Site found. Look for a
-            # many-to-one relationship to Site.
-            for field in obj._meta.fields:
-                if field.remote_field and field.remote_field.model is Site:
-                    try:
-                        site = getattr(obj, field.name)
-                    except Site.DoesNotExist:
-                        continue
-                    if site is not None:
-                        object_domain = site.domain
-                        break
+            raise
+    return render_flatpage(request, f)
 
-    # If all that malarkey found an object domain, use it. Otherwise, fall back
-    # to whatever get_absolute_url() returned.
-    if object_domain is not None:
-        protocol = request.scheme
-        return HttpResponseRedirect("%s://%s%s" % (protocol, object_domain, absurl))
+
+@csrf_protect
+def render_flatpage(request, f):
+    """
+    Internal interface to the flat page view.
+    """
+    # If registration is required for accessing this page, and the user isn't
+    # logged in, redirect to the login page.
+    if f.registration_required and not request.user.is_authenticated:
+        from django.contrib.auth.views import redirect_to_login
+
+        return redirect_to_login(request.path)
+    if f.template_name:
+        template = loader.select_template((f.template_name, DEFAULT_TEMPLATE))
     else:
-        return HttpResponseRedirect(absurl)
+        template = loader.get_template(DEFAULT_TEMPLATE)
+
+    # To avoid having to always use the "|safe" filter in flatpage templates,
+    # mark the title and content as already safe (since they are raw HTML
+    # content in the first place).
+    f.title = mark_safe(f.title)
+    f.content = mark_safe(f.content)
+
+    return HttpResponse(template.render({"flatpage": f}, request))
