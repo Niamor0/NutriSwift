@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}
+{{ user.username }}'s Profile
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-12 px-6 sm:px-8 lg:px-12">
+    <h1 class="text-4xl font-bold text-center text-gray-800 mb-10">{{ user.username }}'s Profile</h1>
+
+    <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-4">Personal Information</h2>
+        <form id="profileForm" class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">Name</label>
+                <input type="text" name="username" value="{{ user.username }}" class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300" readonly>
+            </div>
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">Email</label>
+                <input type="email" name="email" value="{{ user.email }}" class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300" readonly>
+            </div>
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">Phone</label>
+                <input type="text" name="phone" value="{{ user.userprofile.phone }}" class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300" readonly>
+            </div>
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">Address</label>
+                <input type="text" name="address" value="{{ user.userprofile.address }}" class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300" readonly>
+            </div>
+            <div class="sm:col-span-2">
+                <label class="block text-gray-700 font-semibold mb-2">Joined on</label>
+                <input type="text" value="{{ user.date_joined|date:"d M Y" }}" class="w-full px-4 py-2 border rounded-md bg-gray-100 cursor-not-allowed" readonly>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.getElementById('profileForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const button = e.target.querySelector('button[type="submit"]');
+        button.classList.add('animate-pulse');
+        setTimeout(() => {
+            button.classList.remove('animate-pulse');
+            alert('Profile updated successfully!');
+        }, 1000);
+    });
+</script>
+{% endblock %}

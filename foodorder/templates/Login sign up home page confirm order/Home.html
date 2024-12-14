@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+
+{% block title %}NutriSwift - Home {% endblock %}
+
+{% block content %}
+
+<div class="hero-slider owl-carousel owl-theme"> 
+    <div class="relative h-[600px]"> <img src="https://i.postimg.cc/dt3NW2Wf/hero-bg.jpg" alt="Hero Image 1"
+            class="w-full h-full object-cover">
+        <div class="hero-overlay"></div>
+        <div class="hero-content absolute top-1/2 left-24 transform -translate-y-1/2 text-white">
+            <p class="text-lg mb-4 tracking-wider text-yellow-400">NutriSwift Food Ordering Service</p>
+            <h1 class="text-5xl font-bold mb-8 max-w-2xl leading-tight"> Our mission is to provide an unforgettable
+                experience </h1>
+                <a href="{% url 'all_products' %}"
+                class="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full transition-colors">
+                Order Now
+             </a>
+        </div>
+    </div>
+</div>
+
+<!-- Featured Categories -->
+<section class="py-16 bg-gray-100">
+    <div class="container mx-auto px-4">
+        <h2 class="text-3xl font-bold text-center mb-12">Our Featured Categories</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <a href="{% url 'pizza' %}" class="block">
+                <div class="bg-white rounded-lg shadow-md overflow-hidden transition-transform hover:scale-105">
+                    <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                        alt="Pizza" class="w-full h-48 object-cover">
+                    <div class="p-4">
+                        <h3 class="font-bold text-xl mb-2">Pizza</h3>
+                        <p class="text-gray-600">Delicious hand-tossed pizzas</p>
+                    </div>
+                </div>
+            </a>
+            <a href="{% url 'burger' %}" class="block">
+                <div class="bg-white rounded-lg shadow-md overflow-hidden transition-transform hover:scale-105">
+                    <img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=1998&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                        alt="Burger" class="w-full h-48 object-cover">
+                    <div class="p-4">
+                        <h3 class="font-bold text-xl mb-2">Burgers</h3>
+                        <p class="text-gray-600">Juicy, mouth-watering burgers</p>
+                    </div>
+                </div>
+            </a>
+            <a href="{% url 'pasta' %}" class="block">
+                <div class="bg-white rounded-lg shadow-md overflow-hidden transition-transform hover:scale-105">
+                    <img src="https://images.unsplash.com/photo-1473093226795-af9932fe5856?q=80&w=1994&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                        alt="Salad" class="w-full h-48 object-cover">
+                    <div class="p-4">
+                        <h3 class="font-bold text-xl mb-2">Pasta</h3>
+                        <p class="text-gray-600">Fresh and healthy Pasta</p>
+                    </div>
+                </div>
+            </a>
+            <a href="{% url 'dessert' %}" class="block">
+                <div class="bg-white rounded-lg shadow-md overflow-hidden transition-transform hover:scale-105">
+                    <img src="https://images.unsplash.com/photo-1486428128344-5413e434ad35?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                        alt="Dessert" class="w-full h-48 object-cover">
+                    <div class="p-4">
+                        <h3 class="font-bold text-xl mb-2">Desserts</h3>
+                        <p class="text-gray-600">Sweet treats to indulge in</p>
+                    </div>
+                </div>
+            </a>
+
+        </div>
+    </div>
+</section>
+
+<!-- How It Works -->
+<section class="py-16 bg-yellow-50">
+    <div class="container mx-auto px-4">
+        <h2 class="text-3xl font-bold text-center mb-12">How It Works</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="text-center">
+                <div class="bg-yellow-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+                <h3 class="font-bold text-xl mb-2">Choose Your Meal</h3>
+                <p class="text-gray-600">Browse our menu and select your favorite dishes</p>
+            </div>
+            <div class="text-center">
+                <div class="bg-yellow-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                </div>
+                <h3 class="font-bold text-xl mb-2">Place Your Order</h3>
+                <p class="text-gray-600">Customize your order and proceed to checkout</p>
+            </div>
+            <div class="text-center">
+                <div class="bg-yellow-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                </div>
+                <h3 class="font-bold text-xl mb-2">Fast Delivery</h3>
+                <p class="text-gray-600">Enjoy your meal delivered right to your doorstep</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Featured Dishes -->
+<section class="py-16">
+    <div class="container mx-auto px-4">
+        <h2 class="text-3xl font-bold text-center mb-12">Featured Dishes</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                <img src="https://images.unsplash.com/photo-1579349443343-73da56a71a20?q=80&w=1964&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                    alt="Pasta Dish" class="w-full h-48 object-cover">
+                <div class="p-4">
+                    <h3 class="font-bold text-xl mb-2">Creamy Garlic Pasta</h3>
+                    <p class="text-gray-600 mb-4">Rich and flavorful pasta with a creamy garlic sauce</p>
+                    <div class="flex justify-between items-center">
+                        <span class="text-yellow-500 font-bold text-xl">
+                            ৳ 1200
+                        </span>
+                        <button
+                            class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-full transition-colors">
+                            Add to Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                <img src="https://plus.unsplash.com/premium_photo-1723672929404-36ba6ed8ab50?q=80&w=1963&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                    alt="Steak Dish" class="w-full h-48 object-cover">
+                <div class="p-4">
+                    <h3 class="font-bold text-xl mb-2">Grilled Ribeye Steak</h3>
+                    <p class="text-gray-600 mb-4">Juicy ribeye steak grilled to perfection</p>
+                    <div class="flex justify-between items-center">
+                        <span class="text-yellow-500 font-bold text-xl">৳ 2400</span>
+                        <button
+                            class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-full transition-colors">
+                            Add to Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                <img src="https://images.unsplash.com/photo-1611143669185-af224c5e3252?q=80&w=1932&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                    alt="Sushi Dish" class="w-full h-48 object-cover">
+                <div class="p-4">
+                    <h3 class="font-bold text-xl mb-2">Assorted Sushi Platter</h3>
+                    <p class="text-gray-600 mb-4">A variety of fresh sushi rolls and sashimi</p>
+                    <div class="flex justify-between items-center">
+                        <span class="text-yellow-500 font-bold text-xl">
+                            ৳ 1800
+                        </span>
+                        <button
+                            class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-full transition-colors">
+                            Add to Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Call to Action -->
+<section class="py-16 bg-yellow-500">
+    <div class="container mx-auto px-4 text-center">
+        <h2 class="text-3xl font-bold text-white mb-4">Ready to Order?</h2>
+        <p class="text-xl text-white mb-8">Enjoy delicious meals delivered straight to your door!</p>
+        <button
+            class="bg-white hover:bg-gray-100 text-yellow-500 px-8 py-3 rounded-full transition-colors text-lg font-semibold">
+            Order Now
+        </button>
+    </div>
+</section>
+{% endblock %}

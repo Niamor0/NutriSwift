@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}User Login{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100 py-12 px-6 lg:px-8">
+    <div class="max-w-2xl w-full bg-white shadow-lg rounded-lg p-8 space-y-8">
+        <!-- Image Placeholder -->
+        <div class="flex justify-center">
+            <img src="https://i.postimg.cc/Hs0DZnHV/821326.png" alt="Login" class="w-64 h-64 object-cover rounded-full">
+        </div>
+
+        <!-- Welcome Header -->
+        <div>
+            <h2 class="text-center text-4xl font-extrabold text-gray-900">Welcome Back!</h2>
+            <p class="mt-2 text-center text-sm text-gray-600">
+                Please sign in to access your account
+            </p>
+        </div>
+
+        <!-- Login Form -->
+        <form class="mt-6 space-y-6" method="POST">
+            {% csrf_token %}
+            <div class="space-y-4">
+                <!-- Username Field -->
+                <div>
+                    <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
+                    <div class="relative mt-1">
+                        <input id="username" name="username" type="text" required
+                               class="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 text-gray-900 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                               placeholder="Enter your username">
+                        <i class="fas fa-user absolute top-3 right-3 text-gray-400"></i>
+                    </div>
+                </div>
+
+                <!-- Password Field -->
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <div class="relative mt-1">
+                        <input id="password" name="password" type="password" required
+                               class="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 text-gray-900 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                               placeholder="Enter your password">
+                        <i class="fas fa-lock absolute top-3 right-3 text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div>
+                <button type="submit"
+                        class="w-full flex justify-center py-3 px-6 border border-transparent text-lg font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-sign-in-alt mr-2"></i> Sign in
+                </button>
+            </div>
+
+            <!-- Additional Links -->
+            <div class="flex justify-between items-center mt-4">
+                <a href="{% url 'signup' %}" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+                    <i class="fas fa-user-plus mr-1"></i> Don't have an account? Sign up
+                </a>
+                <a href="{% url 'admin_login' %}" class="text-sm font-medium text-red-600 hover:text-red-500">
+                    <i class="fas fa-user-shield mr-1"></i> Admin Login
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
