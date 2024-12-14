@@ -339,3 +339,264 @@ def product_detail(request, product_type, product_id):
     }
     
     return render(request, 'product_detail.html', context)
+def AllProductsView(request):
+    pizzas = Pizza.objects.all()
+    pastas = Pasta.objects.all()
+    burgers = Burger.objects.all()
+    desserts = Dessert.objects.all()
+    return render(request, 'all_products.html', {
+        'pizzas': pizzas,
+        'pastas': pastas,
+        'burgers': burgers,
+        'desserts': desserts
+    })
+
+
+# Cart Views
+@login_required
+def add_to_cart(request, product_type, product_id):
+    # Map product types to models
+    product_models = {
+        'pizza': Pizza,
+        'pasta': Pasta,
+        'burger': Burger,
+        'dessert': Dessert
+    }
+    
+    model = product_models.get(product_type.lower())
+    if not model:
+        return JsonResponse({'error': 'Invalid product type'}, status=400)
+    
+    product = get_object_or_404(model, id=product_id)
+    quantity = int(request.POST.get('quantity', 1))
+    
+    # Get or create cart
+    cart, created = Cart.objects.get_or_create(user=request.user)
+    
+    # Check if item already exists in cart
+    try:
+        cart_item = CartItem.objects.get(
+            cart=cart,
+            product_type=product_type.capitalize(),
+            product_id=product_id
+        )
+        cart_item.quantity += quantity
+        cart_item.save()
+    except CartItem.DoesNotExist:
+        CartItem.objects.create(
+            cart=cart,
+            product_type=product_type.capitalize(),
+            product_id=product_id,
+            quantity=quantity,
+            price=Decimal(str(product.price))
+        )
+    
+    messages.success(request, 'Item added to cart successfully!')
+    return redirect('cart_view')
+
+@login_required(login_url='login')
+def cart_view(request):
+    try:
+        cart = Cart.objects.get(user=request.user)
+        cart_items = []
+        
+        for item in cart.items.all():
+            # Get the actual product object
+            product_models = {
+                'Pizza': Pizza,
+                'Pasta': Pasta,
+                'Burger': Burger,
+                'Dessert': Dessert
+            }
+            product = product_models[item.product_type].objects.get(id=item.product_id)
+            
+            cart_items.append({
+                'item': item,
+                'product': product,
+                'subtotal': item.subtotal
+            })
+        
+        context = {
+            'cart_items': cart_items,
+            'total': cart.total_price
+        }
+    except Cart.DoesNotExist:
+        context = {
+            'cart_items': [],
+            'total': 0
+        }
+    
+    return render(request, 'cart.html', context)
+
+@login_required(login_url='login')
+def update_cart(request, item_id):
+    cart_item = get_object_or_404(CartItem, id=item_id, cart__user=request.user)
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'increase':
+            cart_item.quantity += 1
+        elif action == 'decrease':
+            if cart_item.quantity > 1:
+                cart_item.quantity -= 1
+            else:
+                cart_item.delete()
+                return redirect('cart_view')
+        elif action == 'remove':
+            cart_item.delete()
+            return redirect('cart_view')
+            
+        cart_item.save()
+    
+    return redirect('cart_view')
+
+@login_required(login_url='login')
+def checkout(request):
+    try:
+        cart = Cart.objects.get(user=request.user)
+        if not cart.items.exists():
+            messages.error(request, 'Your cart is empty!')
+            return redirect('cart_view')
+        
+        if request.method == 'POST':
+            # Create Order
+            order = Order.objects.create(
+                user=request.user,
+                cart=cart,
+                total_price=cart.total_price,
+                payment_method=request.POST.get('payment_method'),
+                status='Payment_Pending'
+            )
+            
+            # Create OrderItems
+            for cart_item in cart.items.all():
+                OrderItem.objects.create(
+                    order=order,
+                    product_type=cart_item.product_type,
+                    product_id=cart_item.product_id,
+                    quantity=cart_item.quantity,
+                    price=cart_item.price
+                )
+            
+            # Create Delivery
+            Delivery.objects.create(
+                order=order,
+                address=request.POST.get('address'),
+                contact_number=request.POST.get('phone')
+            )
+            
+            # Create new cart for user
+            cart.delete()
+            
+            messages.success(request, 'Order placed successfully!')
+            return redirect('order_confirmation', order_id=order.id)
+        
+        return render(request, 'checkout.html', {
+            'cart': cart,
+            'total': cart.total_price
+        })
+        
+    except Cart.DoesNotExist:
+        messages.error(request, 'Your cart is empty!')
+        return redirect('cart_view')
+
+@login_required(login_url='login')
+def order_confirmation(request, order_id):
+    order = get_object_or_404(Order, id=order_id, user=request.user)
+    
+    # Get order items with their details
+    order_items = []
+    product_models = {
+        'pizza': Pizza,
+        'pasta': Pasta,
+        'burger': Burger,
+        'dessert': Dessert
+    }
+    
+    for item in order.items.all():
+        product_model = product_models.get(item.product_type.lower())
+        if not product_model:
+            messages.error(request, f"Invalid product type: {item.product_type}. Please check your order.")
+            continue
+
+        try:
+            product = product_model.objects.get(id=item.product_id)
+            subtotal = item.price * item.quantity
+            order_items.append({
+                'item': item,
+                'product': product,
+                'subtotal': subtotal
+            })
+        except product_model.DoesNotExist:
+            messages.error(request, f"Product not found for ID: {item.product_id}. Please check your order.")
+
+    context = {
+        'order': order,
+        'order_items': order_items,
+        'delivery': order.delivery  
+    }
+    
+    return render(request, 'order_confirmation.html', context)
+
+@login_required(login_url='login')
+def order_history(request):
+    orders = Order.objects.filter(user=request.user).order_by('-created_at')
+    return render(request, 'order_history.html', {'orders': orders})
+
+@login_required(login_url='login')
+def order_detail(request, order_id):
+    order = get_object_or_404(Order, id=order_id, user=request.user)
+    
+    # Get order items with their details
+    order_items = []
+    product_models = {
+        'pizza': Pizza,
+        'pasta': Pasta,
+        'burger': Burger,
+        'dessert': Dessert
+    }
+    
+    for item in order.items.all():
+        product_model = product_models.get(item.product_type.lower())
+        if not product_model:
+            messages.error(request, f"Invalid product type: {item.product_type}. Please check your order.")
+            continue
+
+        try:
+            product = product_model.objects.get(id=item.product_id)
+            subtotal = item.price * item.quantity
+            order_items.append({
+                'item': item,
+                'product': product,
+                'subtotal': subtotal
+            })
+        except product_model.DoesNotExist:
+            messages.error(request, f"Product not found for ID: {item.product_id}. Please check your order.")
+
+    context = {
+        'order': order,
+        'order_items': order_items,
+        'delivery': order.delivery  
+    }
+    
+    return render(request, 'order_detail.html', context)
+
+@login_required(login_url='login')
+def cancel_order(request, order_id):
+    order = get_object_or_404(Order, id=order_id, user=request.user)
+    
+    if order.status == 'Payment_Pending':
+        order.status = 'Cancelled'
+        order.save()
+        messages.success(request, 'Order cancelled successfully!')
+    else:
+        messages.error(request, 'Order cannot be cancelled!')
+    
+    return redirect('order_detail', order_id=order_id)
+
+def about(request):
+    return render(request, 'about.html')
+
+def contact(request):
+    return render(request, 'Contact.html')
