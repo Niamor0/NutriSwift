@@ -1,50 +1,36 @@
-from django.contrib.admindocs import views
-from django.urls import path, re_path
+# The views used below are normally mapped in the AdminSite instance.
+# This URLs file is used to provide a reliable view deployment for test purposes.
+# It is also provided as a convenience to those who want to deploy these URLs
+# elsewhere.
+
+from django.contrib.auth import views
+from django.urls import path
 
 urlpatterns = [
+    path("login/", views.LoginView.as_view(), name="login"),
+    path("logout/", views.LogoutView.as_view(), name="logout"),
     path(
-        "",
-        views.BaseAdminDocsView.as_view(template_name="admin_doc/index.html"),
-        name="django-admindocs-docroot",
+        "password_change/", views.PasswordChangeView.as_view(), name="password_change"
     ),
     path(
-        "bookmarklets/",
-        views.BookmarkletsView.as_view(),
-        name="django-admindocs-bookmarklets",
+        "password_change/done/",
+        views.PasswordChangeDoneView.as_view(),
+        name="password_change_done",
+    ),
+    path("password_reset/", views.PasswordResetView.as_view(), name="password_reset"),
+    path(
+        "password_reset/done/",
+        views.PasswordResetDoneView.as_view(),
+        name="password_reset_done",
     ),
     path(
-        "tags/",
-        views.TemplateTagIndexView.as_view(),
-        name="django-admindocs-tags",
+        "reset/<uidb64>/<token>/",
+        views.PasswordResetConfirmView.as_view(),
+        name="password_reset_confirm",
     ),
     path(
-        "filters/",
-        views.TemplateFilterIndexView.as_view(),
-        name="django-admindocs-filters",
-    ),
-    path(
-        "views/",
-        views.ViewIndexView.as_view(),
-        name="django-admindocs-views-index",
-    ),
-    path(
-        "views/<view>/",
-        views.ViewDetailView.as_view(),
-        name="django-admindocs-views-detail",
-    ),
-    path(
-        "models/",
-        views.ModelIndexView.as_view(),
-        name="django-admindocs-models-index",
-    ),
-    re_path(
-        r"^models/(?P<app_label>[^.]+)\.(?P<model_name>[^/]+)/$",
-        views.ModelDetailView.as_view(),
-        name="django-admindocs-models-detail",
-    ),
-    path(
-        "templates/<path:template>/",
-        views.TemplateDetailView.as_view(),
-        name="django-admindocs-templates",
+        "reset/done/",
+        views.PasswordResetCompleteView.as_view(),
+        name="password_reset_complete",
     ),
 ]

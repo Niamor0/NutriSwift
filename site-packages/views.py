@@ -1,503 +1,384 @@
-import inspect
-from importlib import import_module
-from inspect import cleandoc
-from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 
-from django.apps import apps
-from django.contrib import admin
-from django.contrib.admin.views.decorators import staff_member_required
-from django.contrib.admindocs import utils
-from django.contrib.admindocs.utils import (
-    remove_non_capturing_groups,
-    replace_metacharacters,
-    replace_named_groups,
-    replace_unnamed_groups,
+from django.conf import settings
+
+# Avoid shadowing the login() and logout() views below.
+from django.contrib.auth import REDIRECT_FIELD_NAME, get_user_model
+from django.contrib.auth import login as auth_login
+from django.contrib.auth import logout as auth_logout
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.decorators import login_not_required, login_required
+from django.contrib.auth.forms import (
+    AuthenticationForm,
+    PasswordChangeForm,
+    PasswordResetForm,
+    SetPasswordForm,
 )
-from django.core.exceptions import ImproperlyConfigured, ViewDoesNotExist
-from django.db import models
-from django.http import Http404
-from django.template.engine import Engine
-from django.urls import get_mod_func, get_resolver, get_urlconf
-from django.utils._os import safe_join
+from django.contrib.auth.tokens import default_token_generator
+from django.contrib.sites.shortcuts import get_current_site
+from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.http import HttpResponseRedirect, QueryDict
+from django.shortcuts import resolve_url
+from django.urls import reverse_lazy
 from django.utils.decorators import method_decorator
-from django.utils.functional import cached_property
-from django.utils.inspect import (
-    func_accepts_kwargs,
-    func_accepts_var_args,
-    get_func_full_args,
-    method_has_no_args,
-)
-from django.utils.translation import gettext as _
-from django.views.generic import TemplateView
+from django.utils.http import url_has_allowed_host_and_scheme, urlsafe_base64_decode
+from django.utils.translation import gettext_lazy as _
+from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.debug import sensitive_post_parameters
+from django.views.generic.base import TemplateView
+from django.views.generic.edit import FormView
 
-from .utils import get_view_name
-
-# Exclude methods starting with these strings from documentation
-MODEL_METHODS_EXCLUDE = ("_", "add_", "delete", "save", "set_")
+UserModel = get_user_model()
 
 
-class BaseAdminDocsView(TemplateView):
+class RedirectURLMixin:
+    next_page = None
+    redirect_field_name = REDIRECT_FIELD_NAME
+    success_url_allowed_hosts = set()
+
+    def get_success_url(self):
+        return self.get_redirect_url() or self.get_default_redirect_url()
+
+    def get_redirect_url(self):
+        """Return the user-originating redirect URL if it's safe."""
+        redirect_to = self.request.POST.get(
+            self.redirect_field_name, self.request.GET.get(self.redirect_field_name)
+        )
+        url_is_safe = url_has_allowed_host_and_scheme(
+            url=redirect_to,
+            allowed_hosts=self.get_success_url_allowed_hosts(),
+            require_https=self.request.is_secure(),
+        )
+        return redirect_to if url_is_safe else ""
+
+    def get_success_url_allowed_hosts(self):
+        return {self.request.get_host(), *self.success_url_allowed_hosts}
+
+    def get_default_redirect_url(self):
+        """Return the default redirect URL."""
+        if self.next_page:
+            return resolve_url(self.next_page)
+        raise ImproperlyConfigured("No URL to redirect to. Provide a next_page.")
+
+
+@method_decorator(login_not_required, name="dispatch")
+class LoginView(RedirectURLMixin, FormView):
     """
-    Base view for admindocs views.
+    Display the login form and handle the login action.
     """
 
-    @method_decorator(staff_member_required)
+    form_class = AuthenticationForm
+    authentication_form = None
+    template_name = "registration/login.html"
+    redirect_authenticated_user = False
+    extra_context = None
+
+    @method_decorator(sensitive_post_parameters())
+    @method_decorator(csrf_protect)
+    @method_decorator(never_cache)
     def dispatch(self, request, *args, **kwargs):
-        if not utils.docutils_is_available:
-            # Display an error message for people without docutils
-            self.template_name = "admin_doc/missing_docutils.html"
-            return self.render_to_response(admin.site.each_context(request))
+        if self.redirect_authenticated_user and self.request.user.is_authenticated:
+            redirect_to = self.get_success_url()
+            if redirect_to == self.request.path:
+                raise ValueError(
+                    "Redirection loop for authenticated user detected. Check that "
+                    "your LOGIN_REDIRECT_URL doesn't point to a login page."
+                )
+            return HttpResponseRedirect(redirect_to)
         return super().dispatch(request, *args, **kwargs)
 
+    def get_default_redirect_url(self):
+        """Return the default redirect URL."""
+        if self.next_page:
+            return resolve_url(self.next_page)
+        else:
+            return resolve_url(settings.LOGIN_REDIRECT_URL)
+
+    def get_form_class(self):
+        return self.authentication_form or self.form_class
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
+    def form_valid(self, form):
+        """Security check complete. Log the user in."""
+        auth_login(self.request, form.get_user())
+        return HttpResponseRedirect(self.get_success_url())
+
     def get_context_data(self, **kwargs):
-        return super().get_context_data(
-            **{
-                **kwargs,
-                **admin.site.each_context(self.request),
+        context = super().get_context_data(**kwargs)
+        current_site = get_current_site(self.request)
+        context.update(
+            {
+                self.redirect_field_name: self.get_redirect_url(),
+                "site": current_site,
+                "site_name": current_site.name,
+                **(self.extra_context or {}),
             }
         )
+        return context
 
 
-class BookmarkletsView(BaseAdminDocsView):
-    template_name = "admin_doc/bookmarklets.html"
+class LogoutView(RedirectURLMixin, TemplateView):
+    """
+    Log out the user and display the 'You are logged out' message.
+    """
 
+    http_method_names = ["post", "options"]
+    template_name = "registration/logged_out.html"
+    extra_context = None
 
-class TemplateTagIndexView(BaseAdminDocsView):
-    template_name = "admin_doc/template_tag_index.html"
+    @method_decorator(csrf_protect)
+    @method_decorator(never_cache)
+    def dispatch(self, request, *args, **kwargs):
+        return super().dispatch(request, *args, **kwargs)
 
-    def get_context_data(self, **kwargs):
-        tags = []
-        try:
-            engine = Engine.get_default()
-        except ImproperlyConfigured:
-            # Non-trivial TEMPLATES settings aren't supported (#24125).
-            pass
+    def post(self, request, *args, **kwargs):
+        """Logout may be done via POST."""
+        auth_logout(request)
+        redirect_to = self.get_success_url()
+        if redirect_to != request.get_full_path():
+            # Redirect to target page once the session has been cleared.
+            return HttpResponseRedirect(redirect_to)
+        return super().get(request, *args, **kwargs)
+
+    def get_default_redirect_url(self):
+        """Return the default redirect URL."""
+        if self.next_page:
+            return resolve_url(self.next_page)
+        elif settings.LOGOUT_REDIRECT_URL:
+            return resolve_url(settings.LOGOUT_REDIRECT_URL)
         else:
-            app_libs = sorted(engine.template_libraries.items())
-            builtin_libs = [("", lib) for lib in engine.template_builtins]
-            for module_name, library in builtin_libs + app_libs:
-                for tag_name, tag_func in library.tags.items():
-                    title, body, metadata = utils.parse_docstring(tag_func.__doc__)
-                    title = title and utils.parse_rst(
-                        title, "tag", _("tag:") + tag_name
-                    )
-                    body = body and utils.parse_rst(body, "tag", _("tag:") + tag_name)
-                    for key in metadata:
-                        metadata[key] = utils.parse_rst(
-                            metadata[key], "tag", _("tag:") + tag_name
-                        )
-                    tag_library = module_name.split(".")[-1]
-                    tags.append(
-                        {
-                            "name": tag_name,
-                            "title": title,
-                            "body": body,
-                            "meta": metadata,
-                            "library": tag_library,
-                        }
-                    )
-        return super().get_context_data(**{**kwargs, "tags": tags})
-
-
-class TemplateFilterIndexView(BaseAdminDocsView):
-    template_name = "admin_doc/template_filter_index.html"
+            return self.request.path
 
     def get_context_data(self, **kwargs):
-        filters = []
-        try:
-            engine = Engine.get_default()
-        except ImproperlyConfigured:
-            # Non-trivial TEMPLATES settings aren't supported (#24125).
-            pass
-        else:
-            app_libs = sorted(engine.template_libraries.items())
-            builtin_libs = [("", lib) for lib in engine.template_builtins]
-            for module_name, library in builtin_libs + app_libs:
-                for filter_name, filter_func in library.filters.items():
-                    title, body, metadata = utils.parse_docstring(filter_func.__doc__)
-                    title = title and utils.parse_rst(
-                        title, "filter", _("filter:") + filter_name
-                    )
-                    body = body and utils.parse_rst(
-                        body, "filter", _("filter:") + filter_name
-                    )
-                    for key in metadata:
-                        metadata[key] = utils.parse_rst(
-                            metadata[key], "filter", _("filter:") + filter_name
-                        )
-                    tag_library = module_name.split(".")[-1]
-                    filters.append(
-                        {
-                            "name": filter_name,
-                            "title": title,
-                            "body": body,
-                            "meta": metadata,
-                            "library": tag_library,
-                        }
-                    )
-        return super().get_context_data(**{**kwargs, "filters": filters})
-
-
-class ViewIndexView(BaseAdminDocsView):
-    template_name = "admin_doc/view_index.html"
-
-    def get_context_data(self, **kwargs):
-        views = []
-        url_resolver = get_resolver(get_urlconf())
-        try:
-            view_functions = extract_views_from_urlpatterns(url_resolver.url_patterns)
-        except ImproperlyConfigured:
-            view_functions = []
-        for func, regex, namespace, name in view_functions:
-            views.append(
-                {
-                    "full_name": get_view_name(func),
-                    "url": simplify_regex(regex),
-                    "url_name": ":".join((namespace or []) + (name and [name] or [])),
-                    "namespace": ":".join(namespace or []),
-                    "name": name,
-                }
-            )
-        return super().get_context_data(**{**kwargs, "views": views})
-
-
-class ViewDetailView(BaseAdminDocsView):
-    template_name = "admin_doc/view_detail.html"
-
-    @staticmethod
-    def _get_view_func(view):
-        urlconf = get_urlconf()
-        if get_resolver(urlconf)._is_callback(view):
-            mod, func = get_mod_func(view)
-            try:
-                # Separate the module and function, e.g.
-                # 'mymodule.views.myview' -> 'mymodule.views', 'myview').
-                return getattr(import_module(mod), func)
-            except ImportError:
-                # Import may fail because view contains a class name, e.g.
-                # 'mymodule.views.ViewContainer.my_view', so mod takes the form
-                # 'mymodule.views.ViewContainer'. Parse it again to separate
-                # the module and class.
-                mod, klass = get_mod_func(mod)
-                return getattr(getattr(import_module(mod), klass), func)
-
-    def get_context_data(self, **kwargs):
-        view = self.kwargs["view"]
-        view_func = self._get_view_func(view)
-        if view_func is None:
-            raise Http404
-        title, body, metadata = utils.parse_docstring(view_func.__doc__)
-        title = title and utils.parse_rst(title, "view", _("view:") + view)
-        body = body and utils.parse_rst(body, "view", _("view:") + view)
-        for key in metadata:
-            metadata[key] = utils.parse_rst(metadata[key], "model", _("view:") + view)
-        return super().get_context_data(
-            **{
-                **kwargs,
-                "name": view,
-                "summary": title,
-                "body": body,
-                "meta": metadata,
+        context = super().get_context_data(**kwargs)
+        current_site = get_current_site(self.request)
+        context.update(
+            {
+                "site": current_site,
+                "site_name": current_site.name,
+                "title": _("Logged out"),
+                "subtitle": None,
+                **(self.extra_context or {}),
             }
         )
+        return context
 
 
-class ModelIndexView(BaseAdminDocsView):
-    template_name = "admin_doc/model_index.html"
+def logout_then_login(request, login_url=None):
+    """
+    Log out the user if they are logged in. Then redirect to the login page.
+    """
+    login_url = resolve_url(login_url or settings.LOGIN_URL)
+    return LogoutView.as_view(next_page=login_url)(request)
+
+
+def redirect_to_login(next, login_url=None, redirect_field_name=REDIRECT_FIELD_NAME):
+    """
+    Redirect the user to the login page, passing the given 'next' page.
+    """
+    resolved_url = resolve_url(login_url or settings.LOGIN_URL)
+
+    login_url_parts = list(urlparse(resolved_url))
+    if redirect_field_name:
+        querystring = QueryDict(login_url_parts[4], mutable=True)
+        querystring[redirect_field_name] = next
+        login_url_parts[4] = querystring.urlencode(safe="/")
+
+    return HttpResponseRedirect(urlunparse(login_url_parts))
+
+
+# Class-based password reset views
+# - PasswordResetView sends the mail
+# - PasswordResetDoneView shows a success message for the above
+# - PasswordResetConfirmView checks the link the user clicked and
+#   prompts for a new password
+# - PasswordResetCompleteView shows a success message for the above
+
+
+class PasswordContextMixin:
+    extra_context = None
 
     def get_context_data(self, **kwargs):
-        m_list = [m._meta for m in apps.get_models()]
-        return super().get_context_data(**{**kwargs, "models": m_list})
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {"title": self.title, "subtitle": None, **(self.extra_context or {})}
+        )
+        return context
 
 
-class ModelDetailView(BaseAdminDocsView):
-    template_name = "admin_doc/model_detail.html"
+@method_decorator(login_not_required, name="dispatch")
+class PasswordResetView(PasswordContextMixin, FormView):
+    email_template_name = "registration/password_reset_email.html"
+    extra_email_context = None
+    form_class = PasswordResetForm
+    from_email = None
+    html_email_template_name = None
+    subject_template_name = "registration/password_reset_subject.txt"
+    success_url = reverse_lazy("password_reset_done")
+    template_name = "registration/password_reset_form.html"
+    title = _("Password reset")
+    token_generator = default_token_generator
 
-    def get_context_data(self, **kwargs):
-        model_name = self.kwargs["model_name"]
-        # Get the model class.
-        try:
-            app_config = apps.get_app_config(self.kwargs["app_label"])
-        except LookupError:
-            raise Http404(_("App %(app_label)r not found") % self.kwargs)
-        try:
-            model = app_config.get_model(model_name)
-        except LookupError:
-            raise Http404(
-                _("Model %(model_name)r not found in app %(app_label)r") % self.kwargs
+    @method_decorator(csrf_protect)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def form_valid(self, form):
+        opts = {
+            "use_https": self.request.is_secure(),
+            "token_generator": self.token_generator,
+            "from_email": self.from_email,
+            "email_template_name": self.email_template_name,
+            "subject_template_name": self.subject_template_name,
+            "request": self.request,
+            "html_email_template_name": self.html_email_template_name,
+            "extra_email_context": self.extra_email_context,
+        }
+        form.save(**opts)
+        return super().form_valid(form)
+
+
+INTERNAL_RESET_SESSION_TOKEN = "_password_reset_token"
+
+
+@method_decorator(login_not_required, name="dispatch")
+class PasswordResetDoneView(PasswordContextMixin, TemplateView):
+    template_name = "registration/password_reset_done.html"
+    title = _("Password reset sent")
+
+
+@method_decorator(login_not_required, name="dispatch")
+class PasswordResetConfirmView(PasswordContextMixin, FormView):
+    form_class = SetPasswordForm
+    post_reset_login = False
+    post_reset_login_backend = None
+    reset_url_token = "set-password"
+    success_url = reverse_lazy("password_reset_complete")
+    template_name = "registration/password_reset_confirm.html"
+    title = _("Enter new password")
+    token_generator = default_token_generator
+
+    @method_decorator(sensitive_post_parameters())
+    @method_decorator(never_cache)
+    def dispatch(self, *args, **kwargs):
+        if "uidb64" not in kwargs or "token" not in kwargs:
+            raise ImproperlyConfigured(
+                "The URL path must contain 'uidb64' and 'token' parameters."
             )
 
-        opts = model._meta
+        self.validlink = False
+        self.user = self.get_user(kwargs["uidb64"])
 
-        title, body, metadata = utils.parse_docstring(model.__doc__)
-        title = title and utils.parse_rst(title, "model", _("model:") + model_name)
-        body = body and utils.parse_rst(body, "model", _("model:") + model_name)
-
-        # Gather fields/field descriptions.
-        fields = []
-        for field in opts.fields:
-            # ForeignKey is a special case since the field will actually be a
-            # descriptor that returns the other object
-            if isinstance(field, models.ForeignKey):
-                data_type = field.remote_field.model.__name__
-                app_label = field.remote_field.model._meta.app_label
-                verbose = utils.parse_rst(
-                    (
-                        _("the related `%(app_label)s.%(data_type)s` object")
-                        % {
-                            "app_label": app_label,
-                            "data_type": data_type,
-                        }
-                    ),
-                    "model",
-                    _("model:") + data_type,
-                )
+        if self.user is not None:
+            token = kwargs["token"]
+            if token == self.reset_url_token:
+                session_token = self.request.session.get(INTERNAL_RESET_SESSION_TOKEN)
+                if self.token_generator.check_token(self.user, session_token):
+                    # If the token is valid, display the password reset form.
+                    self.validlink = True
+                    return super().dispatch(*args, **kwargs)
             else:
-                data_type = get_readable_field_data_type(field)
-                verbose = field.verbose_name
-            fields.append(
-                {
-                    "name": field.name,
-                    "data_type": data_type,
-                    "verbose": verbose or "",
-                    "help_text": field.help_text,
-                }
-            )
-
-        # Gather many-to-many fields.
-        for field in opts.many_to_many:
-            data_type = field.remote_field.model.__name__
-            app_label = field.remote_field.model._meta.app_label
-            verbose = _("related `%(app_label)s.%(object_name)s` objects") % {
-                "app_label": app_label,
-                "object_name": data_type,
-            }
-            fields.append(
-                {
-                    "name": "%s.all" % field.name,
-                    "data_type": "List",
-                    "verbose": utils.parse_rst(
-                        _("all %s") % verbose, "model", _("model:") + opts.model_name
-                    ),
-                }
-            )
-            fields.append(
-                {
-                    "name": "%s.count" % field.name,
-                    "data_type": "Integer",
-                    "verbose": utils.parse_rst(
-                        _("number of %s") % verbose,
-                        "model",
-                        _("model:") + opts.model_name,
-                    ),
-                }
-            )
-
-        methods = []
-        # Gather model methods.
-        for func_name, func in model.__dict__.items():
-            if inspect.isfunction(func) or isinstance(
-                func, (cached_property, property)
-            ):
-                try:
-                    for exclude in MODEL_METHODS_EXCLUDE:
-                        if func_name.startswith(exclude):
-                            raise StopIteration
-                except StopIteration:
-                    continue
-                verbose = func.__doc__
-                verbose = verbose and (
-                    utils.parse_rst(
-                        cleandoc(verbose), "model", _("model:") + opts.model_name
+                if self.token_generator.check_token(self.user, token):
+                    # Store the token in the session and redirect to the
+                    # password reset form at a URL without the token. That
+                    # avoids the possibility of leaking the token in the
+                    # HTTP Referer header.
+                    self.request.session[INTERNAL_RESET_SESSION_TOKEN] = token
+                    redirect_url = self.request.path.replace(
+                        token, self.reset_url_token
                     )
-                )
-                # Show properties, cached_properties, and methods without
-                # arguments as fields. Otherwise, show as a 'method with
-                # arguments'.
-                if isinstance(func, (cached_property, property)):
-                    fields.append(
-                        {
-                            "name": func_name,
-                            "data_type": get_return_data_type(func_name),
-                            "verbose": verbose or "",
-                        }
-                    )
-                elif (
-                    method_has_no_args(func)
-                    and not func_accepts_kwargs(func)
-                    and not func_accepts_var_args(func)
-                ):
-                    fields.append(
-                        {
-                            "name": func_name,
-                            "data_type": get_return_data_type(func_name),
-                            "verbose": verbose or "",
-                        }
-                    )
-                else:
-                    arguments = get_func_full_args(func)
-                    # Join arguments with ', ' and in case of default value,
-                    # join it with '='. Use repr() so that strings will be
-                    # correctly displayed.
-                    print_arguments = ", ".join(
-                        [
-                            "=".join([arg_el[0], *map(repr, arg_el[1:])])
-                            for arg_el in arguments
-                        ]
-                    )
-                    methods.append(
-                        {
-                            "name": func_name,
-                            "arguments": print_arguments,
-                            "verbose": verbose or "",
-                        }
-                    )
+                    return HttpResponseRedirect(redirect_url)
 
-        # Gather related objects
-        for rel in opts.related_objects:
-            verbose = _("related `%(app_label)s.%(object_name)s` objects") % {
-                "app_label": rel.related_model._meta.app_label,
-                "object_name": rel.related_model._meta.object_name,
-            }
-            accessor = rel.accessor_name
-            fields.append(
-                {
-                    "name": "%s.all" % accessor,
-                    "data_type": "List",
-                    "verbose": utils.parse_rst(
-                        _("all %s") % verbose, "model", _("model:") + opts.model_name
-                    ),
-                }
-            )
-            fields.append(
-                {
-                    "name": "%s.count" % accessor,
-                    "data_type": "Integer",
-                    "verbose": utils.parse_rst(
-                        _("number of %s") % verbose,
-                        "model",
-                        _("model:") + opts.model_name,
-                    ),
-                }
-            )
-        return super().get_context_data(
-            **{
-                **kwargs,
-                "name": opts.label,
-                "summary": title,
-                "description": body,
-                "fields": fields,
-                "methods": methods,
-            }
-        )
+        # Display the "Password reset unsuccessful" page.
+        return self.render_to_response(self.get_context_data())
 
+    def get_user(self, uidb64):
+        try:
+            # urlsafe_base64_decode() decodes to bytestring
+            uid = urlsafe_base64_decode(uidb64).decode()
+            user = UserModel._default_manager.get(pk=uid)
+        except (
+            TypeError,
+            ValueError,
+            OverflowError,
+            UserModel.DoesNotExist,
+            ValidationError,
+        ):
+            user = None
+        return user
 
-class TemplateDetailView(BaseAdminDocsView):
-    template_name = "admin_doc/template_detail.html"
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.user
+        return kwargs
+
+    def form_valid(self, form):
+        user = form.save()
+        del self.request.session[INTERNAL_RESET_SESSION_TOKEN]
+        if self.post_reset_login:
+            auth_login(self.request, user, self.post_reset_login_backend)
+        return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
-        template = self.kwargs["template"]
-        templates = []
-        try:
-            default_engine = Engine.get_default()
-        except ImproperlyConfigured:
-            # Non-trivial TEMPLATES settings aren't supported (#24125).
-            pass
+        context = super().get_context_data(**kwargs)
+        if self.validlink:
+            context["validlink"] = True
         else:
-            directories = list(default_engine.dirs)
-            for loader in default_engine.template_loaders:
-                if hasattr(loader, "get_dirs"):
-                    for dir_ in loader.get_dirs():
-                        if dir_ not in directories:
-                            directories.append(dir_)
-            for index, directory in enumerate(directories):
-                template_file = Path(safe_join(directory, template))
-                if template_file.exists():
-                    template_contents = template_file.read_text()
-                else:
-                    template_contents = ""
-                templates.append(
-                    {
-                        "file": template_file,
-                        "exists": template_file.exists(),
-                        "contents": template_contents,
-                        "order": index,
-                    }
-                )
-        return super().get_context_data(
-            **{
-                **kwargs,
-                "name": template,
-                "templates": templates,
-            }
-        )
-
-
-####################
-# Helper functions #
-####################
-
-
-def get_return_data_type(func_name):
-    """Return a somewhat-helpful data type given a function name"""
-    if func_name.startswith("get_"):
-        if func_name.endswith("_list"):
-            return "List"
-        elif func_name.endswith("_count"):
-            return "Integer"
-    return ""
-
-
-def get_readable_field_data_type(field):
-    """
-    Return the description for a given field type, if it exists. Fields'
-    descriptions can contain format strings, which will be interpolated with
-    the values of field.__dict__ before being output.
-    """
-    return field.description % field.__dict__
-
-
-def extract_views_from_urlpatterns(urlpatterns, base="", namespace=None):
-    """
-    Return a list of views from a list of urlpatterns.
-
-    Each object in the returned list is a 4-tuple:
-    (view_func, regex, namespace, name)
-    """
-    views = []
-    for p in urlpatterns:
-        if hasattr(p, "url_patterns"):
-            try:
-                patterns = p.url_patterns
-            except ImportError:
-                continue
-            views.extend(
-                extract_views_from_urlpatterns(
-                    patterns,
-                    base + str(p.pattern),
-                    (namespace or []) + (p.namespace and [p.namespace] or []),
-                )
+            context.update(
+                {
+                    "form": None,
+                    "title": _("Password reset unsuccessful"),
+                    "validlink": False,
+                }
             )
-        elif hasattr(p, "callback"):
-            try:
-                views.append((p.callback, base + str(p.pattern), namespace, p.name))
-            except ViewDoesNotExist:
-                continue
-        else:
-            raise TypeError(_("%s does not appear to be a urlpattern object") % p)
-    return views
+        return context
 
 
-def simplify_regex(pattern):
-    r"""
-    Clean up urlpattern regexes into something more readable by humans. For
-    example, turn "^(?P<sport_slug>\w+)/athletes/(?P<athlete_slug>\w+)/$"
-    into "/<sport_slug>/athletes/<athlete_slug>/".
-    """
-    pattern = remove_non_capturing_groups(pattern)
-    pattern = replace_named_groups(pattern)
-    pattern = replace_unnamed_groups(pattern)
-    pattern = replace_metacharacters(pattern)
-    if not pattern.startswith("/"):
-        pattern = "/" + pattern
-    return pattern
+@method_decorator(login_not_required, name="dispatch")
+class PasswordResetCompleteView(PasswordContextMixin, TemplateView):
+    template_name = "registration/password_reset_complete.html"
+    title = _("Password reset complete")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["login_url"] = resolve_url(settings.LOGIN_URL)
+        return context
+
+
+class PasswordChangeView(PasswordContextMixin, FormView):
+    form_class = PasswordChangeForm
+    success_url = reverse_lazy("password_change_done")
+    template_name = "registration/password_change_form.html"
+    title = _("Password change")
+
+    @method_decorator(sensitive_post_parameters())
+    @method_decorator(csrf_protect)
+    @method_decorator(login_required)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        form.save()
+        # Updating the password logs out all other sessions for the user
+        # except the current one.
+        update_session_auth_hash(self.request, form.user)
+        return super().form_valid(form)
+
+
+class PasswordChangeDoneView(PasswordContextMixin, TemplateView):
+    template_name = "registration/password_change_done.html"
+    title = _("Password change successful")
+
+    @method_decorator(login_required)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
